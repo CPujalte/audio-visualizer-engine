@@ -309,19 +309,20 @@ class VisElemCircle(VisualizerElement):
         circle_draw.ellipse(corners, tuple(color), self.border_color, self.border_width)
 
         return circle_img
-    
+
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def render_visualizer(visualizer_elements:  Sequence[VisualizerElement],
-                      fr_width:             int = 1920,
-                      fr_height:            int = 1080
-                      ) -> Image.Image:
+@dataclass(frozen=True)
+class VisElemGroup(VisualizerElement):
+    """ Combines multiple VisualizerElements into a single RGBA Image. """
+    visualizer_elements:  Sequence[VisualizerElement]
 
-    if not visualizer_elements:
-        return Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
+    def __call__(self, fr_width: int = 1920, fr_height: int = 1080) -> Image.Image:
+        if self.visualizer_elements is None:
+            return Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
 
-    main_img = Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
-    for element in visualizer_elements:
-        main_img.alpha_composite(element(fr_width=fr_width, fr_height=fr_height))
+        main_img = Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
+        for element in self.visualizer_elements:
+            main_img.alpha_composite(element(fr_width=fr_width, fr_height=fr_height))
 
-    return main_img
+        return main_img

@@ -257,45 +257,46 @@ class DitheringForceBanding(DitheringEffect):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-def render_background(main_color:     tuple[int, int, int, int],
-                      accent_color:   tuple[int, int, int, int],
-                      param_grid:     np.ndarray | None = None,
-                      fr_width:       int = 1920,
-                      fr_height:      int = 1080,
-                      intensity:      float = 0.0,
-                      mesh_generator: MeshGenerator = MeshGenRadial(),
-                      mesh_reaction:  Sequence[MeshReaction] | None = None,
-                      color_reaction: Sequence[ColorReaction] | None = None,
-                      dithering:      DitheringEffect | None = None
-                      ) -> Image.Image:
-    """ Renders a canvas in RGBA with a lineal gradient between a central color and a border color. """
+@dataclass(frozen=True)
+class RenderBackground(ABC):
+    """ Renders a single background Image in format RGBA. """
+    main_color:     tuple[int, int, int, int]
+    accent_color:   tuple[int, int, int, int]
+    param_grid:     np.ndarray | None = None
+    intensity:      float = 0.0
+    mesh_generator: MeshGenerator = MeshGenRadial()
+    mesh_reaction:  Sequence[MeshReaction] | None = None
+    color_reaction: Sequence[ColorReaction] | None = None
+    dithering:      DitheringEffect | None = None
 
-    # Grid creation in case of not provided
-    intensity = float(intensity)
-    working_grid = mesh_generator(fr_width, fr_height) if param_grid is None else np.astype(param_grid, np.float32)
+    def __call__(self, fr_width: int = 1920, fr_height: int = 1080) -> Image.Image:
 
-    # Mesh transformation applications
-    if mesh_reaction is not None:
-        for reaction in mesh_reaction:
-            working_grid = reaction(working_grid, intensity)
+        # Grid creation in case of not provided
+        intensity = float(self.intensity)
+        working_grid = self.mesh_generator(fr_width, fr_height) if self.param_grid is None else np.astype(self.param_grid, np.float32)
 
-    # Color mix between center and border colors
-    main_color = np.array(main_color, dtype=np.float32)
-    accent_color = np.array(accent_color, dtype=np.float32)
-    color_grid = accent_color * working_grid + main_color * (1-working_grid)
+        # Mesh transformation applications
+        if self.mesh_reaction is not None:
+            for reaction in self.mesh_reaction:
+                working_grid = reaction(working_grid, intensity)
 
-    # Post processing color transformation applications
-    if color_reaction is not None:
-        for reaction in color_reaction:
-            color_grid = reaction(color_grid, intensity)
+        # Color mix between center and border colors
+        working_main_color = np.array(self.main_color, dtype=np.float32)
+        working_accent_color = np.array(self.accent_color, dtype=np.float32)
+        color_grid = working_accent_color * working_grid + working_main_color * (1-working_grid)
 
-    # Dithering application
-    color_grid = dithering(color_grid) if dithering is not None else color_grid
+        # Post processing color transformation applications
+        if self.color_reaction is not None:
+            for reaction in self.color_reaction:
+                color_grid = reaction(color_grid, intensity)
 
-    # Image creation and exportation
-    color_grid = color_grid.clip(0, 255)
-    color_grid = np.round(color_grid)
-    color_grid = color_grid.astype(np.uint8)
-    bg_img = Image.fromarray(color_grid)
+        # Dithering application
+        color_grid = self.dithering(color_grid) if self.dithering is not None else color_grid
 
-    return bg_img
+        # Image creation and exportation
+        color_grid = color_grid.clip(0, 255)
+        color_grid = np.round(color_grid)
+        color_grid = color_grid.astype(np.uint8)
+        bg_img = Image.fromarray(color_grid)
+
+        return bg_img

@@ -1,0 +1,35 @@
+# Cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+env/
+
+# Config
+.vscode/
+.DS_Store
+Thumbs.db
+
+# File formats
+*.wav
+*.mp3
+*.flac
+*.mp4
+*.mkv
+*.mov
+*.png
+*.jpg
+*.jpeg
+
+# Directories and paths
+exercises/
+frames/
+test_media/
+test.py
+
+# Exceptions
+!docs/
+!docs/**

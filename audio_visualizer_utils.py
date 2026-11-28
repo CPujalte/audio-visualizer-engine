@@ -1,9 +1,9 @@
 # Audio Visualizer Utils
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageChops
 from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, Protocol
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -219,7 +219,7 @@ class VisElemRadialTriangles(VisualizerElement):
 
     def __call__(self, fr_width = 1920, fr_height = 1080):
 
-        # Anti Aliasing rescaling
+        # Anti Aliasing upscaling
         working_fr_width = fr_width * self.aa_scale
         working_fr_height = fr_height * self.aa_scale
 
@@ -237,8 +237,8 @@ class VisElemRadialTriangles(VisualizerElement):
         min_triang_extension = self.min_triang_extension_coef * min(working_fr_height, working_fr_width) // 2
         max_triang_extension = self.max_triang_extension_coef * min(working_fr_height, working_fr_width) // 2
         triang_extension_range = max_triang_extension - min_triang_extension
-        working_center_x = working_fr_width//2 if self.center_x is None else self.center_x
-        working_center_y = working_fr_height//2 if self.center_y is None else self.center_y
+        working_center_x = (fr_width//2)*self.aa_scale if self.center_x is None else self.center_x
+        working_center_y = (fr_height//2)*self.aa_scale if self.center_y is None else self.center_y
 
         # Coordinate conversion from polar to cartesian and calculation of triangle corners
         radius_array = min_triang_extension + (triang_extension_range * working_intensity_array)
@@ -312,17 +312,63 @@ class VisElemCircle(VisualizerElement):
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+class Renderer(Protocol):
+
+    def __call__(self, fr_width: int = 1920, fr_height: int = 1080) -> Image.Image:
+        pass
+
+
+@dataclass(frozen=True)
+class VisElemMasked(VisualizerElement):
+    """ Takes a VisualizerElement and uses it as a mask with a Background as a texture. """
+    mask_visualizer_element:    VisualizerElement
+    mask_filler:                Image.Image | Renderer
+    invert:                     bool = False
+    resampling:                 Image.Resampling = Image.Resampling.BICUBIC
+
+    def __call__(self, fr_width = 1920, fr_height = 1080) -> Image.Image:
+
+        # Base image obtention and manipulation
+        if isinstance(self.mask_filler, Image.Image):
+            result_img = self.mask_filler
+
+            if self.mask_filler.mode != "RGBA":
+                result_img = result_img.convert("RGBA")
+
+            if self.mask_filler.size != (fr_width, fr_height):
+                result_img = result_img.resize((fr_width, fr_height), resample=self.resampling)
+            elif result_img is self.mask_filler:
+                result_img = self.mask_filler.copy()
+
+        else:
+            result_img = self.mask_filler(fr_width=fr_width, fr_height=fr_height)
+            if result_img.mode != "RGBA":
+                result_img = result_img.convert("RGBA")
+
+        # Alpha manipulation and masking
+        mask_alpha = self.mask_visualizer_element(fr_width=fr_width, fr_height=fr_height).getchannel("A")
+        if self.invert:
+            mask_alpha = ImageChops.invert(mask_alpha)
+
+        mask_filler_alpha = result_img.getchannel("A")
+        combined_alpha = ImageChops.multiply(mask_filler_alpha, mask_alpha)
+        result_img.putalpha(combined_alpha)
+
+        return result_img
+
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 @dataclass(frozen=True)
 class VisElemGroup(VisualizerElement):
     """ Combines multiple VisualizerElements into a single RGBA Image. """
     visualizer_elements:  Sequence[VisualizerElement]
 
     def __call__(self, fr_width: int = 1920, fr_height: int = 1080) -> Image.Image:
-        if self.visualizer_elements is None:
+        if not self.visualizer_elements:
             return Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
 
-        main_img = Image.new("RGBA", (fr_width, fr_height), (0, 0, 0, 0))
-        for element in self.visualizer_elements:
+        main_img = self.visualizer_elements[0](fr_width=fr_width, fr_height=fr_height)
+        for element in self.visualizer_elements[1:]:
             main_img.alpha_composite(element(fr_width=fr_width, fr_height=fr_height))
 
         return main_img

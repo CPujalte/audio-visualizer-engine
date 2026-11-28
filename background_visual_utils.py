@@ -274,10 +274,10 @@ class RenderBackground():
         # Grid creation in case of not provided
         intensity = float(self.intensity)
         if self.param_grid is None:
-            working_grid = self.mesh_generator(fr_width=fr_width, fr_height=fr_height)
+            working_grid = self.mesh_generator(fr_width, fr_height)
         else:
-            if self.param_grid.size != (fr_width, fr_height):
-                raise ValueError(f"Expected param_grid size was {(fr_width, fr_height)}, but size {self.param_grid.size} was recieved")
+            if self.param_grid.shape[:2] != (fr_width, fr_height):
+                raise ValueError(f"Expected param_grid size was {(fr_width, fr_height)}, but size {self.param_grid.shape[:2]} was recieved")
             working_grid = np.astype(self.param_grid, np.float32)
 
         # Mesh transformation applications

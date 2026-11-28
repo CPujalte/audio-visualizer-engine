@@ -258,7 +258,7 @@ class DitheringForceBanding(DitheringEffect):
 # ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 @dataclass(frozen=True)
-class RenderBackground(ABC):
+class RenderBackground():
     """ Renders a single background Image in format RGBA. """
     main_color:     tuple[int, int, int, int]
     accent_color:   tuple[int, int, int, int]
@@ -273,7 +273,12 @@ class RenderBackground(ABC):
 
         # Grid creation in case of not provided
         intensity = float(self.intensity)
-        working_grid = self.mesh_generator(fr_width, fr_height) if self.param_grid is None else np.astype(self.param_grid, np.float32)
+        if self.param_grid is None:
+            working_grid = self.mesh_generator(fr_width=fr_width, fr_height=fr_height)
+        else:
+            if self.param_grid.size != (fr_width, fr_height):
+                raise ValueError(f"Expected param_grid size was {(fr_width, fr_height)}, but size {self.param_grid.size} was recieved")
+            working_grid = np.astype(self.param_grid, np.float32)
 
         # Mesh transformation applications
         if self.mesh_reaction is not None:
